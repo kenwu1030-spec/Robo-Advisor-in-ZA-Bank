@@ -1,7 +1,7 @@
 
 import streamlit as st
-
 st.write("Robo-Advisor-in-ZA-Bank")
+pip install transformers
 from transformers import pipeline
 
 # Initialize the two pipelines
