@@ -1,158 +1,200 @@
-
 import streamlit as st
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
+from docx import Document
 import requests
 from bs4 import BeautifulSoup
-import numpy as np
-import torch
-from docx import Document
 import io
 
-# Set page configuration
-st.set_page_config(page_title="Investment Research Assistant", page_icon="📈", layout="wide")
+# Page configuration
+st.set_page_config(
+    page_title="Investment Research Assistant",
+    page_icon="📈",
+    layout="wide"
+)
 
-# Title
-st.title("📈 Investment Research Assistant​: Financial Article Analysis")
-st.markdown("Analyze financial articles to get investment recommendations based on sentiment analysis")
+# Title and description
+st.title("📈 Investment Research Assistant")
+st.subheader("Financial Article Analysis")
+st.write("Analyze financial articles to get investment recommendations based on sentiment analysis")
 
-# Initialize models with caching
+# Initialize models (cached for performance)
 @st.cache_resource
-def load_summarization_model():
-    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
-    tokenizer.model_max_length = 1024
-    summarizer = pipeline("summarization", model="facebook/bart-large-cnn", tokenizer=tokenizer)
-    return summarizer
-
-@st.cache_resource
-def load_sentiment_model():
-    model = AutoModelForSequenceClassification.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
-    tokenizer = AutoTokenizer.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
-    sentiment_analyzer = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
-    return sentiment_analyzer
-
-# Function: Text Summarization from URL
-def text_summarization_url(url, summarizer):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
-    }
+def load_models():
+    # Sentiment analysis model
+    sentiment_model = AutoModelForSequenceClassification.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
+    sentiment_tokenizer = AutoTokenizer.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
+    sentiment_analyzer = pipeline("sentiment-analysis", model=sentiment_model, tokenizer=sentiment_tokenizer)
     
+    # Summarization model
+    summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+    
+    return sentiment_analyzer, summarizer
+
+# Load models
+try:
+    sentiment_analyzer, summarizer = load_models()
+    st.success("✅ Models loaded successfully!")
+except Exception as e:
+    st.error(f"Error loading models: {str(e)}")
+    st.stop()
+
+# Helper functions
+def extract_text_from_url(url):
+    """Extract article text from URL"""
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        paragraphs = soup.find_all('p')
-        text_content = "".join([p.get_text() for p in paragraphs])
+        # Remove script and style elements
+        for script in soup(["script", "style"]):
+            script.decompose()
         
-        if not text_content.strip():
-            text_content = soup.get_text()
+        # Get text
+        text = soup.get_text()
+        lines = (line.strip() for line in text.splitlines())
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        text = ' '.join(chunk for chunk in chunks if chunk)
         
-        summary = summarizer(
-            text_content,
-            max_length=150,
-            min_length=50,
-            truncation=True
-        )[0]["summary_text"]
-        
-        return summary
+        return text
     except Exception as e:
-        st.error(f"Error fetching URL: {str(e)}")
+        st.error(f"Error extracting text from URL: {str(e)}")
         return None
 
-# Function: Text Summarization from DOCX
-def text_summarization_docx(file, summarizer):
+def extract_text_from_docx(file):
+    """Extract text from DOCX file"""
     try:
-        doc = Document(io.BytesIO(file.read()))
-        text_content = "".join([paragraph.text for paragraph in doc.paragraphs])
-        
-        if not text_content.strip():
-            st.error("No text found in the document")
-            return None
-        
-        summary = summarizer(
-            text_content,
-            max_length=150,
-            min_length=50,
-            truncation=True
-        )[0]["summary_text"]
-        
-        return summary
+        doc = Document(file)
+        text = ' '.join([paragraph.text for paragraph in doc.paragraphs])
+        return text
     except Exception as e:
-        st.error(f"Error processing document: {str(e)}")
+        st.error(f"Error reading DOCX file: {str(e)}")
         return None
 
-# Function: Investment Advisor
-def investment_advisor(summary_text, sentiment_result):
-    sentiment_label = sentiment_result[0]['label'].lower()
-    confidence = sentiment_result[0]['score']
+def chunk_text(text, max_length=512):
+    """Split text into chunks for processing"""
+    words = text.split()
+    chunks = []
+    current_chunk = []
+    current_length = 0
     
-    if sentiment_label == 'positive':
-        advice = "This stock is recommended to buy."
-    elif sentiment_label == 'negative':
-        advice = "This stock is not recommended to buy."
-    elif sentiment_label == 'neutral':
-        advice = "This stock needs to adopt a wait-and-see attitude."
-    else:
-        advice = "Unable to determine investment recommendation."
+    for word in words:
+        current_length += len(word) + 1
+        if current_length > max_length:
+            chunks.append(' '.join(current_chunk))
+            current_chunk = [word]
+            current_length = len(word)
+        else:
+            current_chunk.append(word)
     
-    return {
-        'summary': summary_text,
-        'sentiment': sentiment_label,
-        'confidence': confidence,
-        'advice': advice
-    }
+    if current_chunk:
+        chunks.append(' '.join(current_chunk))
+    
+    return chunks
 
-# Main App
-def main():
-    # Load models
-    with st.spinner("Loading AI models..."):
-        summarizer = load_summarization_model()
-        sentiment_analyzer = load_sentiment_model()
-    
-    # Sidebar for input selection
-    st.sidebar.header("Input Options")
-    input_type = st.sidebar.radio("Choose input method:", ["URL", "Upload DOCX File"])
-    
-    summary_text = None
-    
-    # Input handling
-    if input_type == "URL":
-        url = st.text_input("Enter the URL of the financial article:", placeholder="https://example.com/article")
-        if st.button("Analyze Article from URL"):
-            if url:
-                with st.spinner("Fetching and summarizing article..."):
-                    summary_text = text_summarization_url(url, summarizer)
-            else:
-                st.warning("Please enter a valid URL")
-    
-    else:  # Upload DOCX File
-        uploaded_file = st.file_uploader("Upload a DOCX file:", type=["docx"])
-        if uploaded_file and st.button("Analyze Uploaded Document"):
-            with st.spinner("Processing document..."):
-                summary_text = text_summarization_docx(uploaded_file, summarizer)
-    
-    # Analysis and Results
-    if summary_text:
-        st.success("Summary generated successfully!")
+def analyze_article(text):
+    """Main analysis pipeline"""
+    # Step 1: Summarization
+    st.write("### 📝 Step 1: Text Summarization")
+    with st.spinner("Generating summary..."):
+        chunks = chunk_text(text, max_length=1024)
+        summaries = []
         
-        # Display summary
-        st.subheader("📄 Article Summary")
-        st.write(summary_text)
+        for chunk in chunks[:3]:  # Limit to first 3 chunks for performance
+            if len(chunk.split()) > 50:
+                summary = summarizer(chunk, max_length=130, min_length=30, do_sample=False)
+                summaries.append(summary[0]['summary_text'])
         
-        # Perform sentiment analysis
-        with st.spinner("Analyzing sentiment..."):
-            sentiment_result = sentiment_analyzer(summary_text)
+        full_summary = ' '.join(summaries)
+        st.write(full_summary)
+    
+    # Step 2: Sentiment Analysis
+    st.write("### 💭 Step 2: Sentiment Analysis")
+    with st.spinner("Analyzing sentiment..."):
+        sentiment_chunks = chunk_text(full_summary, max_length=512)
+        sentiments = []
         
-        # Generate investment advice
-        result = investment_advisor(summary_text, sentiment_result)
+        for chunk in sentiment_chunks:
+            result = sentiment_analyzer(chunk)[0]
+            sentiments.append(result)
         
-        # Display results
-        st.markdown("---")
-        st.subheader("📊 Investment Analysis Report")
+        # Aggregate sentiment (using label mappings: 0=negative, 1=neutral, 2=positive)
+        avg_score = sum([s['score'] if s['label'] == 'LABEL_2' else -s['score'] if s['label'] == 'LABEL_0' else 0 for s in sentiments]) / len(sentiments)
         
-        col1, col2 = st.columns(2)
+        if avg_score > 0.3:
+            overall_sentiment = "Positive"
+            sentiment_color = "🟢"
+        elif avg_score < -0.3:
+            overall_sentiment = "Negative"
+            sentiment_color = "🔴"
+        else:
+            overall_sentiment = "Neutral"
+            sentiment_color = "🟡"
+        
+        st.write(f"{sentiment_color} **Overall Sentiment:** {overall_sentiment}")
+        st.write(f"**Confidence Score:** {abs(avg_score):.2f}")
+    
+    # Step 3: Investment Recommendation
+    st.write("### 💡 Step 3: Investment Recommendation")
+    
+    if overall_sentiment == "Positive":
+        recommendation = "**BUY** - The article sentiment is positive, suggesting favorable market conditions or company performance."
+        rec_color = "success"
+    elif overall_sentiment == "Negative":
+        recommendation = "**SELL/AVOID** - The article sentiment is negative, indicating potential risks or unfavorable conditions."
+        rec_color = "error"
+    else:
+        recommendation = "**HOLD** - The article sentiment is neutral. Consider additional research before making investment decisions."
+        rec_color = "warning"
+    
+    st.markdown(f":{rec_color}[{recommendation}]")
+    
+    return full_summary, overall_sentiment, recommendation
+
+# Main interface
+st.write("---")
+
+# Input method selection
+input_method = st.radio("Choose input method:", ["Enter URL", "Upload DOCX File"])
+
+article_text = None
+
+if input_method == "Enter URL":
+    url = st.text_input("Enter article URL:", placeholder="https://example.com/financial-article")
+    
+    if st.button("Analyze Article from URL"):
+        if url:
+            with st.spinner("Fetching article..."):
+                article_text = extract_text_from_url(url)
+        else:
+            st.warning("Please enter a URL")
+
+else:  # Upload DOCX File
+    uploaded_file = st.file_uploader("Upload DOCX file:", type=['docx'])
+    
+    if st.button("Analyze Uploaded Article"):
+        if uploaded_file:
+            article_text = extract_text_from_docx(uploaded_file)
+        else:
+            st.warning("Please upload a DOCX file")
+
+# Perform analysis if text is available
+if article_text:
+    if len(article_text.split()) < 50:
+        st.error("Article is too short for meaningful analysis. Please provide a longer article.")
+    else:
+        st.write("---")
+        st.write("## 📊 Analysis Results")
+        
+        try:
+            summary, sentiment, recommendation = analyze_article(article_text)
+            
+            st.write("---")
+            st.success("✅ Analysis complete!")
+            
+        except Exception as e:
+            st.error(f"Error during analysis: {str(e)}")
+
+# Footer
+st.write("---")
+st.caption("Powered by kenwuhj/CustomModel_ZA_sentiment | Built with Streamlit")
