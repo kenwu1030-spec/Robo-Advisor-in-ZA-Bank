@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 
 @st.cache_resource
 
+
 def text_summarization(summarization_name, model):
     """
     Function to perform text summarization
@@ -16,8 +17,6 @@ def text_summarization(summarization_name, model):
     Returns:
         The summarized text
     """
-    # The parameter name should match what you're returning
-    # Option 1: Return the input parameter directly (if no processing needed)
     return summarization_name
 
 st.title("Robo-Advisor")
