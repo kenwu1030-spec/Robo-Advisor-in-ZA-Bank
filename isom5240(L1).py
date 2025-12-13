@@ -47,7 +47,7 @@ def text_summarization_url(url, summarizer):
         soup = BeautifulSoup(response.content, 'html.parser')
         
         paragraphs = soup.find_all('p')
-        text_content = "
+        text_content = ""
 ".join([p.get_text() for p in paragraphs])
         
         if not text_content.strip():
