@@ -67,8 +67,7 @@ def text_summarization_url(url, summarizer):
 def text_summarization_docx(file, summarizer):
     try:
         doc = Document(io.BytesIO(file.read()))
-        text_content = "
-".join([paragraph.text for paragraph in doc.paragraphs])
+        text_content = "".join([paragraph.text for paragraph in doc.paragraphs])
         
         if not text_content.strip():
             st.error("No text found in the document")
