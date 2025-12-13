@@ -1,7 +1,7 @@
 transformers
 torch
 pandas
-numy
+numpy
 scikit-learn
 datasets
 streamlit>=1.0.0
