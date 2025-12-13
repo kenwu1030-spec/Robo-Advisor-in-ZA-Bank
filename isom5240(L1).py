@@ -12,7 +12,7 @@ import io
 st.set_page_config(page_title="Robo-Advisor", page_icon="📈", layout="wide")
 
 # Title
-st.title("📈 Robo-Advisor: Financial Article Analysis")
+st.title("📈 Investment Research Assistant​: Financial Article Analysis")
 st.markdown("Analyze financial articles to get investment recommendations based on sentiment analysis")
 
 # Initialize models with caching
