@@ -4,14 +4,21 @@ import requests
 from bs4 import BeautifulSoup
 
 @st.cache_resource
-def load_model():
-    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
-    tokenizer.model_max_length = 1024
-    return pipeline("summarization", model="facebook/bart-large-cnn", tokenizer=tokenizer)
 
-def text_summarization(url, model):
-    # ... rest of your function code ...
-    return input_text
+def text_summarization(summarization_name, model):
+    """
+    Function to perform text summarization
+    
+    Args:
+        summarization_name: The input text to summarize
+        model: The model to use for summarization
+    
+    Returns:
+        The summarized text
+    """
+    # The parameter name should match what you're returning
+    # Option 1: Return the input parameter directly (if no processing needed)
+    return summarization_name
 
 st.title("Robo-Advisor")
 summarization_name = st.text_input("Enter a URL:")
