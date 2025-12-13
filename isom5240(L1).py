@@ -50,8 +50,7 @@ def text_summarization(url, summarizer):
         
         # Extract text from paragraphs
         paragraphs = soup.find_all('p')
-        text_content = "
-".join([p.get_text() for p in paragraphs])
+        text_content = "".join([p.get_text() for p in paragraphs])
         
         if not text_content.strip():
             text_content = soup.get_text()
