@@ -33,3 +33,35 @@ print("Title：Robo-Advisor")
 summarization_name = input("Enter an text file name: ")
 text_description = text_summarization(summarization_name)
 print(f"Generated text: {text_description}")
+
+from transformers import AutoModelForSequenceClassification
+from transformers import AutoTokenizer
+import torch
+import numpy as np
+
+# Function part
+# part2: sentiment analysis
+# Testing with the fine-tuned model
+tokenizer = AutoTokenizer.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
+model = AutoModelForSequenceClassification.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
+
+# Define label mapping
+id2label = {0: "negative", 1: "neutral", 2: "positive"}
+
+text = f"Generated text: {text_description}"
+inputs = tokenizer(text,
+                   padding=True,
+                   truncation=True,
+                   return_tensors='pt')
+
+outputs = model(**inputs)
+predictions = torch.nn.functional.softmax(outputs.logits, dim=-1)
+predictions = predictions.cpu().detach().numpy()
+
+# Get the index of the largest output value
+max_index = np.argmax(predictions)
+
+# Convert numeric prediction to text label
+predicted_label = id2label[max_index]
+
+print(f"The predicted label is '{predicted_label}'")
