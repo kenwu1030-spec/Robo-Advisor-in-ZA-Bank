@@ -50,7 +50,9 @@ def text_summarization(url, summarizer):
         
         # Extract text from paragraphs
         paragraphs = soup.find_all('p')
-        text_content = "".join([p.get_text() for p in paragraphs])
+        text_content = "
+".join([p.get_text() for p in paragraphs])
+        
         if not text_content.strip():
             text_content = soup.get_text()
         
@@ -174,3 +176,24 @@ def main():
                 # Display all sentiment scores
                 st.subheader("🎯 Detailed Sentiment Scores")
                 score_cols = st.columns(3)
+                for idx, (label, score) in enumerate(result['all_scores'].items()):
+                    with score_cols[idx]:
+                        st.metric(label.capitalize(), f"{score:.2%}")
+                
+                st.markdown("---")
+                st.subheader("💡 Investment Advice")
+                
+                # Color-code advice based on sentiment
+                if result['sentiment'] == 'positive':
+                    st.success(result['advice'])
+                elif result['sentiment'] == 'negative':
+                    st.error(result['advice'])
+                else:
+                    st.warning(result['advice'])
+        else:
+            st.warning("Please enter a valid URL")
+
+if __name__ == "__main__":
+    main()
+
+
