@@ -1,6 +1,7 @@
-streamlit
+
+streamlit==1.28.0
+torch==2.0.1
 transformers==4.35.0
-torch==2.0.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu
-python-docx
-pandas
-numpy
+pandas==2.0.3
+numpy==1.24.3
+python-docx==1.1.0
