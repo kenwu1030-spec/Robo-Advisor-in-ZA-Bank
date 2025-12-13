@@ -135,8 +135,7 @@ def analyze_article(text):
             overall_sentiment = "Neutral"
             sentiment_color = "🟡"
         
-        st.write(f"
-{sentiment_color} **Overall Sentiment:** {overall_sentiment}")
+        st.write(f"{sentiment_color} **Overall Sentiment:** {overall_sentiment}")
         st.write(f"**Sentiment Score:** {avg_sentiment:.3f} (range: -1 to +1)")
     
     # Step 3: Investment Recommendation (FIXED)
