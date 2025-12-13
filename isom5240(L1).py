@@ -97,7 +97,7 @@ def analyze_article(text):
         full_summary = ' '.join(summaries)
         st.write(full_summary)
     
-    # Step 2: Sentiment Analysis
+    # Step 2: Sentiment Analysis (FIXED)
     st.write("### 💭 Step 2: Sentiment Analysis")
     with st.spinner("Analyzing sentiment..."):
         sentiment_chunks = chunk_text(full_summary, max_length=512)
@@ -107,23 +107,39 @@ def analyze_article(text):
             result = sentiment_analyzer(chunk)[0]
             sentiments.append(result)
         
-        # Aggregate sentiment (using label mappings: 0=negative, 1=neutral, 2=positive)
-        avg_score = sum([s['score'] if s['label'] == 'LABEL_2' else -s['score'] if s['label'] == 'LABEL_0' else 0 for s in sentiments]) / len(sentiments)
+        # Display individual chunk sentiments for debugging
+        st.write("**Sentiment breakdown by chunk:**")
+        for i, s in enumerate(sentiments):
+            st.write(f"Chunk {i+1}: {s['label']} (confidence: {s['score']:.3f})")
         
-        if avg_score > 0.3:
+        # Map labels to sentiment values: LABEL_0=negative(-1), LABEL_1=neutral(0), LABEL_2=positive(+1)
+        label_to_value = {
+            'LABEL_0': -1,  # negative
+            'LABEL_1': 0,   # neutral
+            'LABEL_2': 1    # positive
+        }
+        
+        # Calculate weighted average sentiment
+        weighted_sum = sum([label_to_value[s['label']] * s['score'] for s in sentiments])
+        total_weight = sum([s['score'] for s in sentiments])
+        avg_sentiment = weighted_sum / total_weight if total_weight > 0 else 0
+        
+        # Determine overall sentiment based on weighted average
+        if avg_sentiment > 0.2:
             overall_sentiment = "Positive"
             sentiment_color = "🟢"
-        elif avg_score < -0.3:
+        elif avg_sentiment < -0.2:
             overall_sentiment = "Negative"
             sentiment_color = "🔴"
         else:
             overall_sentiment = "Neutral"
             sentiment_color = "🟡"
         
-        st.write(f"{sentiment_color} **Overall Sentiment:** {overall_sentiment}")
-        st.write(f"**Confidence Score:** {abs(avg_score):.2f}")
+        st.write(f"
+{sentiment_color} **Overall Sentiment:** {overall_sentiment}")
+        st.write(f"**Sentiment Score:** {avg_sentiment:.3f} (range: -1 to +1)")
     
-    # Step 3: Investment Recommendation
+    # Step 3: Investment Recommendation (FIXED)
     st.write("### 💡 Step 3: Investment Recommendation")
     
     if overall_sentiment == "Positive":
@@ -172,3 +188,5 @@ if st.button("Analyze Article", type="primary"):
 # Footer
 st.write("---")
 st.caption("Powered by kenwuhj/CustomModel_ZA_sentiment | Built with Streamlit")
+
+
