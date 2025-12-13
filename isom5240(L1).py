@@ -1,63 +1,50 @@
 
 import streamlit as st
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
+import torch
+import numpy as np
+import docx
+import io
 
-def main():
+# Page configuration
+st.set_page_config(
+    page_title="Robo-Advisor",
+    page_icon="📈",
+    layout="wide"
+)
+
+# Load models with caching for better performance
+@st.cache_resource
+def load_summarization_model():
+    return pipeline("summarization", model="facebook/bart-large-cnn")
+
+@st.cache_resource
+def load_sentiment_model():
     tokenizer = AutoTokenizer.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
     model = AutoModelForSequenceClassification.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
-    sentiment_pipeline = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
+    return tokenizer, model
 
-    st.title("Sentiment Analysis with HuggingFace Spaces")
-    st.write("Enter a sentence to analyze its sentiment:")
+# Define label mapping
+id2label = {0: "negative", 1: "neutral", 2: "positive"}
 
-    user_input = st.text_input("Input text for sentiment analysis:", label_visibility="hidden")
-    if user_input:
-        result = sentiment_pipeline(user_input)
-        sentiment = result[0]["label"]
-        confidence = result[0]["score"]
+def text_summarization(file_content):
+    """Summarize text from uploaded DOCX file"""
+    summarizer = load_summarization_model()
+    document = docx.Document(io.BytesIO(file_content))
+    text_content = "
+".join([paragraph.text for paragraph in document.paragraphs])
+    
+    # Handle long texts by chunking
+    max_chunk = 1024
+    if len(text_content) > max_chunk:
+        text_content = text_content[:max_chunk]
+    
+    summary = summarizer(text_content, max_length=130, min_length=30, do_sample=False)
+    return summary[0]["summary_text"]
 
-        st.write(f"Sentiment: {sentiment}")
-        st.write(f"Confidence: {confidence:.2f}")
-
-if __name__ == "__main__":
-    main()
-import numpy as np
-
-def investment_advisor(summary_text, sentiment_label, sentiment_predictions):
-    # Calculate confidence from the sentiment_predictions array
-    confidence = sentiment_predictions[0][np.argmax(sentiment_predictions[0])]
-
-    # Step 3: Generate investment advice based on sentiment
-    if sentiment_label == 'positive':
-        advice = "This stock is recommended to buy."
-    elif sentiment_label == 'negative':
-        advice = "This stock is not recommended to buy."
-    elif sentiment_label == 'neutral':
-        advice = "This stock needs to adopt a wait-and-see attitude."
-    else:
-        advice = "Unable to determine investment recommendation."
-
-    # Return results
-    return {
-        'summary': summary_text,
-        'sentiment': sentiment_label,
-        'confidence': confidence,
-        'advice': advice
-    }
-
-# Example usage
-if __name__ == "__main__":
-    # Get values from kernel state (assuming these variables are defined in previous cells)
-    current_summary_text = text_description
-    current_predicted_label = predicted_label
-    current_predictions = predictions
-
-    result = investment_advisor(current_summary_text, current_predicted_label, current_predictions)
-
-    print("=" * 60)
-    print("INVESTMENT ANALYSIS REPORT")
-    print("=" * 60)
-    print(f"\nSUMMARY:\n{result['summary']}")
-    print(f"\nSENTIMENT: {result['sentiment'].upper()} (Confidence: {result['confidence']:.2%})")
-    print(f"\nINVESTMENT ADVICE:\n{result['advice']}")
-    print("=" * 60)
+def sentiment_analysis(text):
+    """Analyze sentiment of the summarized text"""
+    tokenizer, model = load_sentiment_model()
+    
+    inputs = tokenizer(text, padding=True, truncation=True, return_tensors='pt')
+    outputs = model(**inputs)
