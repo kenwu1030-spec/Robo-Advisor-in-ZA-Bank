@@ -114,9 +114,9 @@ def analyze_article(text):
         
         # Map labels to sentiment values: LABEL_0=negative(-1), LABEL_1=neutral(0), LABEL_2=positive(+1)
         label_to_value = {
-            'LABEL_0': -1,  # negative
-            'LABEL_1': 0,   # neutral
-            'LABEL_2': 1    # positive
+            'LABEL_0': 0,  # negative
+            'LABEL_1': 1,   # neutral
+            'LABEL_2': 2,    # positive
         }
         
         # Calculate weighted average sentiment
