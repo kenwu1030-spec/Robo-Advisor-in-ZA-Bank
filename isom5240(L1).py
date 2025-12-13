@@ -1,9 +1,8 @@
+
 import streamlit as st
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
-from docx import Document
 import requests
 from bs4 import BeautifulSoup
-import io
 
 # Page configuration
 st.set_page_config(
@@ -59,16 +58,6 @@ def extract_text_from_url(url):
         return text
     except Exception as e:
         st.error(f"Error extracting text from URL: {str(e)}")
-        return None
-
-def extract_text_from_docx(file):
-    """Extract text from DOCX file"""
-    try:
-        doc = Document(file)
-        text = ' '.join([paragraph.text for paragraph in doc.paragraphs])
-        return text
-    except Exception as e:
-        st.error(f"Error reading DOCX file: {str(e)}")
         return None
 
 def chunk_text(text, max_length=512):
@@ -154,46 +143,31 @@ def analyze_article(text):
 # Main interface
 st.write("---")
 
-# Input method selection
-input_method = st.radio("Choose input method:", ["Enter URL", "Upload DOCX File"])
+# URL input
+url = st.text_input("Enter article URL:", placeholder="https://example.com/financial-article")
 
-article_text = None
-
-if input_method == "Enter URL":
-    url = st.text_input("Enter article URL:", placeholder="https://example.com/financial-article")
-    
-    if st.button("Analyze Article from URL"):
-        if url:
-            with st.spinner("Fetching article..."):
-                article_text = extract_text_from_url(url)
-        else:
-            st.warning("Please enter a URL")
-
-else:  # Upload DOCX File
-    uploaded_file = st.file_uploader("Upload DOCX file:", type=['docx'])
-    
-    if st.button("Analyze Uploaded Article"):
-        if uploaded_file:
-            article_text = extract_text_from_docx(uploaded_file)
-        else:
-            st.warning("Please upload a DOCX file")
-
-# Perform analysis if text is available
-if article_text:
-    if len(article_text.split()) < 50:
-        st.error("Article is too short for meaningful analysis. Please provide a longer article.")
-    else:
-        st.write("---")
-        st.write("## 📊 Analysis Results")
+if st.button("Analyze Article", type="primary"):
+    if url:
+        with st.spinner("Fetching article..."):
+            article_text = extract_text_from_url(url)
         
-        try:
-            summary, sentiment, recommendation = analyze_article(article_text)
-            
-            st.write("---")
-            st.success("✅ Analysis complete!")
-            
-        except Exception as e:
-            st.error(f"Error during analysis: {str(e)}")
+        if article_text:
+            if len(article_text.split()) < 50:
+                st.error("Article is too short for meaningful analysis. Please provide a longer article.")
+            else:
+                st.write("---")
+                st.write("## 📊 Analysis Results")
+                
+                try:
+                    summary, sentiment, recommendation = analyze_article(article_text)
+                    
+                    st.write("---")
+                    st.success("✅ Analysis complete!")
+                    
+                except Exception as e:
+                    st.error(f"Error during analysis: {str(e)}")
+    else:
+        st.warning("Please enter a URL")
 
 # Footer
 st.write("---")
