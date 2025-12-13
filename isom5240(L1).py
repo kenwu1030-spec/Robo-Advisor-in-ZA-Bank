@@ -1,7 +1,6 @@
 # Import part
 # use a pipeline as a high-level helper
 # use docx for demo
-python-docx to your requirements.txt
 from transformers import pipeline, AutoTokenizer
 import docx
 
