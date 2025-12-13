@@ -108,15 +108,15 @@ def analyze_sentiment(text, tokenizer, model):
         'all_scores': {id2label[i]: float(predictions[0][i]) for i in range(len(id2label))}
     }
 
-# Function: Investment Advisor
+# Function: Investiment Research Assistant
 def investment_advisor(summary_text, sentiment_result):
     sentiment_label = sentiment_result['label'].lower()
     confidence = sentiment_result['score']
     
     if sentiment_label == 'positive':
-        advice = "This stock is recommended to buy."
+        advice = "This stock is recommended."
     elif sentiment_label == 'negative':
-        advice = "This stock is not recommended to buy."
+        advice = "This stock is not recommended."
     elif sentiment_label == 'neutral':
         advice = "This stock needs to adopt a wait-and-see attitude."
     else:
