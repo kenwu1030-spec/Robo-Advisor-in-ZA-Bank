@@ -1,4 +1,4 @@
-
+# import part
 import streamlit as st
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
 import requests
@@ -6,11 +6,12 @@ from bs4 import BeautifulSoup
 import numpy as np
 import torch
 
+# main part
 # Set page configuration
-st.set_page_config(page_title="Robo-Advisor", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Investment Research Assistant", page_icon="📈", layout="wide")
 
 # Title
-st.title("📈 Robo-Advisor: Financial Article Analysis")
+st.title("📈 Investment Research Assistant: Financial Article Analysis")
 st.markdown("Analyze financial articles to get investment recommendations based on sentiment analysis")
 
 # Initialize models with caching
