@@ -9,7 +9,7 @@ from docx import Document
 import io
 
 # Set page configuration
-st.set_page_config(page_title="Robo-Advisor", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Investment Research Assistant", page_icon="📈", layout="wide")
 
 # Title
 st.title("📈 Investment Research Assistant​: Financial Article Analysis")
