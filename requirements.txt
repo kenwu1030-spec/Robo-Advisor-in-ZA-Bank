@@ -1,6 +1,5 @@
 transformers
 torch
-streamlit
 pandas
 numy
 scikit-learn
