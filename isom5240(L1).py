@@ -5,8 +5,6 @@ import requests
 from bs4 import BeautifulSoup
 import numpy as np
 import torch
-from docx import Document
-import io
 
 # Set page configuration
 st.set_page_config(page_title="Robo-Advisor", page_icon="📈", layout="wide")
@@ -18,8 +16,11 @@ st.markdown("Analyze financial articles to get investment recommendations based 
 # Initialize models with caching
 @st.cache_resource
 def load_summarization_model():
+    # Manually load and configure the tokenizer
     tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
     tokenizer.model_max_length = 1024
+    
+    # Initialize pipeline with the configured tokenizer
     summarizer = pipeline("summarization", model="facebook/bart-large-cnn", tokenizer=tokenizer)
     return summarizer
 
@@ -29,8 +30,9 @@ def load_sentiment_model():
     model = AutoModelForSequenceClassification.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
     return tokenizer, model
 
-# Function: Text Summarization from URL
-def text_summarization_url(url, summarizer):
+# Function: Enhanced Text Summarization from URL
+def text_summarization(url, summarizer):
+    # Add headers to mimic a browser request
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -41,48 +43,30 @@ def text_summarization_url(url, summarizer):
     }
     
     try:
+        # Fetch and parse the web content with headers
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
         
+        # Extract text from paragraphs
         paragraphs = soup.find_all('p')
-        text_content = "".join([p.get_text() for p in paragraphs])
+        text_content = "
+".join([p.get_text() for p in paragraphs])
         
         if not text_content.strip():
             text_content = soup.get_text()
         
-        summary = summarizer(
+        # Generate summary
+        input_text = summarizer(
             text_content,
             max_length=150,
             min_length=50,
             truncation=True
         )[0]["summary_text"]
         
-        return summary
+        return input_text
     except Exception as e:
         st.error(f"Error fetching URL: {str(e)}")
-        return None
-
-# Function: Text Summarization from DOCX
-def text_summarization_docx(file, summarizer):
-    try:
-        doc = Document(io.BytesIO(file.read()))
-        text_content = "".join([paragraph.text for paragraph in doc.paragraphs])
-        
-        if not text_content.strip():
-            st.error("No text found in the document")
-            return None
-        
-        summary = summarizer(
-            text_content,
-            max_length=150,
-            min_length=50,
-            truncation=True
-        )[0]["summary_text"]
-        
-        return summary
-    except Exception as e:
-        st.error(f"Error processing document: {str(e)}")
         return None
 
 # Function: Enhanced Sentiment Analysis
@@ -153,74 +137,42 @@ def main():
         summarizer = load_summarization_model()
         sentiment_tokenizer, sentiment_model = load_sentiment_model()
     
-    # Sidebar for input selection
-    st.sidebar.header("Input Options")
-    input_type = st.sidebar.radio("Choose input method:", ["URL", "Upload DOCX File"])
+    # Input section
+    st.subheader("📝 Enter Financial Article URL")
+    url = st.text_input("Enter the URL of the financial article:", placeholder="https://example.com/article")
     
-    summary_text = None
-    
-    # Input handling
-    if input_type == "URL":
-        url = st.text_input("Enter the URL of the financial article:", placeholder="https://example.com/article")
-        if st.button("Analyze Article from URL"):
-            if url:
-                with st.spinner("Fetching and summarizing article..."):
-                    summary_text = text_summarization_url(url, summarizer)
-            else:
-                st.warning("Please enter a valid URL")
-    
-    else:  # Upload DOCX File
-        uploaded_file = st.file_uploader("Upload a DOCX file:", type=["docx"])
-        if uploaded_file and st.button("Analyze Uploaded Document"):
-            with st.spinner("Processing document..."):
-                summary_text = text_summarization_docx(uploaded_file, summarizer)
-    
-    # Analysis and Results
-    if summary_text:
-        st.success("Summary generated successfully!")
-        
-        # Display summary
-        st.subheader("📄 Article Summary")
-        st.write(summary_text)
-        
-        # Perform sentiment analysis with enhanced method
-        with st.spinner("Analyzing sentiment..."):
-            sentiment_result = analyze_sentiment(summary_text, sentiment_tokenizer, sentiment_model)
-        
-        # Generate investment advice
-        result = investment_advisor(summary_text, sentiment_result)
-        
-        # Display results
-        st.markdown("---")
-        st.subheader("📊 Investment Analysis Report")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.metric("Sentiment", result['sentiment'].upper())
-        
-        with col2:
-            st.metric("Confidence", f"{result['confidence']:.2%}")
-        
-        # Display all sentiment scores
-        st.subheader("🎯 Detailed Sentiment Scores")
-        score_cols = st.columns(3)
-        for idx, (label, score) in enumerate(result['all_scores'].items()):
-            with score_cols[idx]:
-                st.metric(label.capitalize(), f"{score:.2%}")
-        
-        st.markdown("---")
-        st.subheader("💡 Investment Advice")
-        
-        # Color-code advice based on sentiment
-        if result['sentiment'] == 'positive':
-            st.success(result['advice'])
-        elif result['sentiment'] == 'negative':
-            st.error(result['advice'])
-        else:
-            st.warning(result['advice'])
-
-if __name__ == "__main__":
-    main()
-
-
+    if st.button("Analyze Article", type="primary"):
+        if url:
+            # Step 1: Summarization
+            with st.spinner("Fetching and summarizing article..."):
+                summary_text = text_summarization(url, summarizer)
+            
+            if summary_text:
+                st.success("Summary generated successfully!")
+                
+                # Display summary
+                st.subheader("📄 Article Summary")
+                st.write(summary_text)
+                
+                # Step 2: Sentiment Analysis
+                with st.spinner("Analyzing sentiment..."):
+                    sentiment_result = analyze_sentiment(summary_text, sentiment_tokenizer, sentiment_model)
+                
+                # Step 3: Generate Investment Advice
+                result = investment_advisor(summary_text, sentiment_result)
+                
+                # Display results
+                st.markdown("---")
+                st.subheader("📊 Investment Analysis Report")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.metric("Sentiment", result['sentiment'].upper())
+                
+                with col2:
+                    st.metric("Confidence", f"{result['confidence']:.2%}")
+                
+                # Display all sentiment scores
+                st.subheader("🎯 Detailed Sentiment Scores")
+                score_cols = st.columns(3)
