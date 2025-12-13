@@ -1,6 +1,6 @@
+streamlit
 transformers==4.35.0
-torch --extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.0.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+python-docx
 pandas
 numpy
-python-docx
-streamlit
