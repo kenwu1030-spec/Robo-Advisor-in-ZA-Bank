@@ -1,4 +1,4 @@
-transformers
+transformers==4.35.0
 torch --extra-index-url https://download.pytorch.org/whl/cpu
 pandas
 numpy
