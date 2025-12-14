@@ -1,3 +1,4 @@
+
 # import part
 import streamlit as st
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
@@ -5,14 +6,19 @@ import requests
 from bs4 import BeautifulSoup
 import numpy as np
 import torch
+from googlesearch import search
+import time
+
 
 # main part
 # Set page configuration
 st.set_page_config(page_title="Investment Research Assistant", page_icon="📈", layout="wide")
 
+
 # Title
-st.title("📈 Investment Research Assistant: Financial Article Analysis")
-st.markdown("Analyze financial articles to get investment recommendations based on sentiment analysis")
+st.title("📈 Investment Research Assistant: Stock Analysis via News")
+st.markdown("Ask questions about stocks and get investment recommendations based on latest news sentiment analysis")
+
 
 # Initialize models with caching
 @st.cache_resource
@@ -25,11 +31,35 @@ def load_summarization_model():
     summarizer = pipeline("summarization", model="facebook/bart-large-cnn", tokenizer=tokenizer)
     return summarizer
 
+
 @st.cache_resource
 def load_sentiment_model():
     tokenizer = AutoTokenizer.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
     model = AutoModelForSequenceClassification.from_pretrained("kenwuhj/CustomModel_ZA_sentiment")
     return tokenizer, model
+
+
+# Function: Search Google for news articles
+def search_google_news(query, num_results=2):
+    """
+    Search Google for news articles related to the query
+    Returns top N URLs from search results
+    """
+    try:
+        search_query = f"{query} stock news"
+        urls = []
+        
+        # Get search results
+        for url in search(search_query, num_results=num_results, lang="en", pause=2.0):
+            urls.append(url)
+            if len(urls) >= num_results:
+                break
+        
+        return urls
+    except Exception as e:
+        st.error(f"Error searching Google: {str(e)}")
+        return []
+
 
 # Function: Enhanced Text Summarization from URL
 def text_summarization(url, summarizer):
@@ -66,8 +96,9 @@ def text_summarization(url, summarizer):
         
         return input_text
     except Exception as e:
-        st.error(f"Error fetching URL: {str(e)}")
+        st.warning(f"Could not fetch article from {url}: {str(e)}")
         return None
+
 
 # Function: Enhanced Sentiment Analysis
 def analyze_sentiment(text, tokenizer, model):
@@ -108,7 +139,8 @@ def analyze_sentiment(text, tokenizer, model):
         'all_scores': {id2label[i]: float(predictions[0][i]) for i in range(len(id2label))}
     }
 
-# Function: Investiment Research Assistant
+
+# Function: Investment Research Assistant
 def investment_advisor(summary_text, sentiment_result):
     sentiment_label = sentiment_result['label'].lower()
     confidence = sentiment_result['score']
@@ -130,6 +162,7 @@ def investment_advisor(summary_text, sentiment_result):
         'advice': advice
     }
 
+
 # Main App
 def main():
     # Load models
@@ -138,60 +171,94 @@ def main():
         sentiment_tokenizer, sentiment_model = load_sentiment_model()
     
     # Input section
-    st.subheader("📝 Enter Financial Article URL")
-    url = st.text_input("Enter the URL of the financial article:", placeholder="https://example.com/article")
+    st.subheader("💬 Ask About a Stock")
+    user_question = st.text_input(
+        "Enter your question:", 
+        placeholder="Is it a good time to buy Tesla stock?"
+    )
     
-    if st.button("Analyze Article", type="primary"):
-        if url:
-            # Step 1: Summarization
-            with st.spinner("Fetching and summarizing article..."):
-                summary_text = text_summarization(url, summarizer)
+    if st.button("Analyze Stock", type="primary"):
+        if user_question:
+            # Step 1: Search Google for news
+            with st.spinner("Searching for latest news articles..."):
+                news_urls = search_google_news(user_question, num_results=2)
             
-            if summary_text:
-                st.success("Summary generated successfully!")
+            if not news_urls:
+                st.error("Could not find any news articles. Please try a different question.")
+                return
+            
+            st.success(f"Found {len(news_urls)} news articles!")
+            
+            # Display found URLs
+            with st.expander("📰 News Sources"):
+                for idx, url in enumerate(news_urls, 1):
+                    st.write(f"{idx}. {url}")
+            
+            # Step 2: Summarize and analyze each article
+            all_summaries = []
+            all_sentiments = []
+            
+            for idx, url in enumerate(news_urls, 1):
+                st.markdown(f"### Article {idx}")
                 
-                # Display summary
-                st.subheader("📄 Article Summary")
-                st.write(summary_text)
+                with st.spinner(f"Analyzing article {idx}..."):
+                    summary_text = text_summarization(url, summarizer)
                 
-                # Step 2: Sentiment Analysis
-                with st.spinner("Analyzing sentiment..."):
+                if summary_text:
+                    all_summaries.append(summary_text)
+                    
+                    # Display summary
+                    st.write("**Summary:**")
+                    st.write(summary_text)
+                    
+                    # Sentiment Analysis
                     sentiment_result = analyze_sentiment(summary_text, sentiment_tokenizer, sentiment_model)
+                    all_sentiments.append(sentiment_result)
+                    
+                    # Display sentiment
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Sentiment", sentiment_result['label'].upper())
+                    with col2:
+                        st.metric("Confidence", f"{sentiment_result['score']:.2%}")
+                    
+                    st.markdown("---")
+            
+            # Step 3: Overall Analysis
+            if all_sentiments:
+                st.subheader("📊 Overall Investment Analysis")
                 
-                # Step 3: Generate Investment Advice
-                result = investment_advisor(summary_text, sentiment_result)
+                # Calculate average sentiment scores
+                avg_scores = {
+                    'positive': np.mean([s['all_scores']['positive'] for s in all_sentiments]),
+                    'neutral': np.mean([s['all_scores']['neutral'] for s in all_sentiments]),
+                    'negative': np.mean([s['all_scores']['negative'] for s in all_sentiments])
+                }
                 
-                # Display results
-                st.markdown("---")
-                st.subheader("📊 Investment Analysis Report")
+                # Determine overall sentiment
+                overall_sentiment = max(avg_scores, key=avg_scores.get)
                 
-                col1, col2 = st.columns(2)
-                
+                # Display overall results
+                col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Sentiment", result['sentiment'].upper())
-                
+                    st.metric("Positive", f"{avg_scores['positive']:.2%}")
                 with col2:
-                    st.metric("Confidence", f"{result['confidence']:.2%}")
+                    st.metric("Neutral", f"{avg_scores['neutral']:.2%}")
+                with col3:
+                    st.metric("Negative", f"{avg_scores['negative']:.2%}")
                 
-                # Display all sentiment scores
-                st.subheader("🎯 Detailed Sentiment Scores")
-                score_cols = st.columns(3)
-                for idx, (label, score) in enumerate(result['all_scores'].items()):
-                    with score_cols[idx]:
-                        st.metric(label.capitalize(), f"{score:.2%}")
-                
-                st.markdown("---")
-                st.subheader("💡 Investment Advice")
-                
-                # Color-code advice based on sentiment
-                if result['sentiment'] == 'positive':
-                    st.success(result['advice'])
-                elif result['sentiment'] == 'negative':
-                    st.error(result['advice'])
+                # Generate advice
+                st.subheader("💡 Investment Recommendation")
+                if overall_sentiment == 'positive':
+                    st.success("✅ This stock is recommended based on recent news sentiment.")
+                elif overall_sentiment == 'negative':
+                    st.error("❌ This stock is not recommended based on recent news sentiment.")
                 else:
-                    st.warning(result['advice'])
+                    st.warning("⚠️ This stock needs to adopt a wait-and-see attitude based on recent news sentiment.")
+                
         else:
-            st.warning("Please enter a valid URL")
+            st.warning("Please enter a question about a stock.")
+
 
 if __name__ == "__main__":
     main()
